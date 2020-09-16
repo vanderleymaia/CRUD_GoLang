@@ -11,6 +11,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"net/http"
@@ -58,8 +59,10 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/healthz", Healthz).Methods("GET")
 	router.HandleFunc("/todo", CreateItem).Methods("POST")
+	router.HandleFunc("/todo2", CreateItem2).Methods("POST")
 
 	router.HandleFunc("/todo/{id}", UpdateItem).Methods("POST")
+	router.HandleFunc("/todo2/{id}", UpdateItem2).Methods("POST")
 	router.HandleFunc("/todo/{id}", DeleteItem).Methods("DELETE")
 	router.HandleFunc("/todo-completed", GetCompletedItems).Methods("GET")
 	router.HandleFunc("/todo-incomplete", GetIncompleteItems).Methods("GET")
@@ -86,6 +89,23 @@ func CreateItem(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result.Value)
 }
 
+// CreateItem2 is responsible to create new itens (USING BODY JSON DATA)
+func CreateItem2(w http.ResponseWriter, r *http.Request) {
+	//Declare a new task
+	var task TodoItemModel
+
+	err := json.NewDecoder(r.Body).Decode(&task)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	todo := &TodoItemModel{Description: task.Description, Location: task.Location, Completed: false}
+	db.Create(&todo)
+	result := db.Last(&todo)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result.Value)
+}
+
 // UpdateItem is responsible to update new itens
 func UpdateItem(w http.ResponseWriter, r *http.Request) {
 	// Get URL parameter from mux
@@ -103,6 +123,46 @@ func UpdateItem(w http.ResponseWriter, r *http.Request) {
 		todo := &TodoItemModel{}
 		db.First(&todo, id)
 		todo.Completed = completed
+		db.Save(&todo)
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"updated": true}`)
+	}
+}
+
+// UpdateItem2 is responsible to update new itens (USING BODY JSON DATA)
+func UpdateItem2(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Printf("Updating...")
+	// Get URL parameter from mux
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
+
+	fmt.Printf("ID %v", id)
+
+	//Declare a new task
+	var task TodoItemModel
+
+	errDec := json.NewDecoder(r.Body).Decode(&task)
+	if errDec != nil {
+		http.Error(w, errDec.Error(), http.StatusBadRequest)
+	}
+
+	fmt.Println(task)
+
+	// Test if the TodoItem exist in DB
+	err := GetItemByID(id)
+	if err == false {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"updated": false, "error": "Record Not Found"}`)
+	} else {
+		var todo TodoItemModel
+		db.First(&todo, id)
+
+		todo.Completed = task.Completed
+		todo.Description = task.Description
+		todo.Location = task.Location
+
+		fmt.Println(todo)
 		db.Save(&todo)
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, `{"updated": true}`)
