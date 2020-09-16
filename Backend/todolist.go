@@ -12,16 +12,18 @@ package main
 import (
 	"encoding/json"
 	"io"
+
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"github.com/rs/cors"
 
 	"strconv"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var db, _ = gorm.Open("mysql", "root:root@/todolist?charset=utf8&parseTime=True&loc=Local")
@@ -62,7 +64,11 @@ func main() {
 	router.HandleFunc("/todo-completed", GetCompletedItems).Methods("GET")
 	router.HandleFunc("/todo-incomplete", GetIncompleteItems).Methods("GET")
 
-	http.ListenAndServe(":8000", router)
+	handler := cors.New(cors.Options{
+		AllowedMethods: []string{"GET", "POST", "DELETE", "PATCH", "OPTIONS"},
+	}).Handler(router)
+
+	http.ListenAndServe(":8000", handler)
 }
 
 // CreateItem is responsible to create new itens
